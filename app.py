@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "default_secret_key")
 
-# Sample content for demonstration
+# Sample contents for demonstration
 SAMPLE_CONTENT = """#!/bin/bash
 # Cardano node startup script
 export CARDANO_NODE_SOCKET_PATH="/node/socket/node.socket"
@@ -31,20 +31,34 @@ cardano-node run \
   --config ${NODE_HOME}/config/mainnet-config.json
 """
 
+# Sample tip query result for demonstration
+SAMPLE_TIP_CONTENT = """{
+  "epoch": 215,
+  "hash": "6b3e5232dc21e05f856ac0e5bcc4412f19f2e5eb9b1a96e97c8c978e5350ded7",
+  "slot": 4310469,
+  "block": 4638927,
+  "era": "Babbage",
+  "syncProgress": "100.00"
+}"""
+
 def is_docker_available():
     """
     Check if Docker is available on the system
     """
     return shutil.which('docker') is not None
 
-def execute_docker_command(use_simulation=False):
+def execute_docker_command(command_type="file", use_simulation=False):
     """
-    Execute the Docker command to get the contents of the cardano.start file
-    If use_simulation is True, return sample content instead of running the command
+    Execute Docker commands to get information from the Cardano node
+    command_type: "file" to get the cardano.start file or "tip" to get node tip info
+    use_simulation: If True, return sample content instead of running the command
     """
     if use_simulation:
-        logger.info("Using simulation mode - returning sample content")
-        return {"success": True, "content": SAMPLE_CONTENT, "error": None, "simulation": True}
+        logger.info(f"Using simulation mode - returning sample {command_type} content")
+        if command_type == "tip":
+            return {"success": True, "content": SAMPLE_TIP_CONTENT, "error": None, "simulation": True}
+        else:  # default to file
+            return {"success": True, "content": SAMPLE_CONTENT, "error": None, "simulation": True}
     
     if not is_docker_available():
         error_message = "Docker is not installed or not available in the system PATH"
@@ -52,9 +66,17 @@ def execute_docker_command(use_simulation=False):
         return {"success": False, "content": None, "error": error_message, "simulation": False}
     
     try:
-        logger.debug("Executing Docker command")
+        logger.debug(f"Executing Docker command for {command_type}")
+        
+        if command_type == "tip":
+            # Execute the tip query command
+            cmd = ["docker", "exec", "cardano-node-1", "cardano-cli", "query", "tip", "--testnet-magic", "42"]
+        else:
+            # Default to getting the file content
+            cmd = ["docker", "exec", "cardano-node-1", "cat", "/shared/cardano.start"]
+            
         result = subprocess.run(
-            ["docker", "exec", "cardano-node-1", "cat", "/shared/cardano.start"],
+            cmd,
             capture_output=True,
             text=True,
             check=True
@@ -90,7 +112,35 @@ def get_file_content():
     use_simulation = request.args.get('simulation', 'false').lower() == 'true'
     
     # Execute command with simulation parameter
-    result = execute_docker_command(use_simulation=use_simulation)
+    result = execute_docker_command(command_type="file", use_simulation=use_simulation)
+    
+    if result["success"]:
+        return jsonify({
+            "success": True,
+            "content": result["content"],
+            "timestamp": datetime.now().isoformat(),
+            "simulation": result.get("simulation", False)
+        })
+    else:
+        return jsonify({
+            "success": False,
+            "error": result["error"],
+            "timestamp": datetime.now().isoformat(),
+            "simulation": result.get("simulation", False)
+        }), 500
+
+@app.route('/get-node-tip')
+def get_node_tip():
+    """
+    API endpoint to get the Cardano node tip information
+    """
+    logger.info(f"Node tip info requested at {datetime.now().isoformat()}")
+    
+    # Check if simulation mode was requested
+    use_simulation = request.args.get('simulation', 'false').lower() == 'true'
+    
+    # Execute command with simulation parameter
+    result = execute_docker_command(command_type="tip", use_simulation=use_simulation)
     
     if result["success"]:
         return jsonify({
