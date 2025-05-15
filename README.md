@@ -42,15 +42,40 @@ A web-based application that displays the contents of files from a Cardano node 
    ```
 
 4. Set up the PostgreSQL database:
-   - Create a PostgreSQL database
-   - Set the following environment variables:
-     ```
-     export DATABASE_URL=postgresql://<username>:<password>@<host>:<port>/<dbname>
-     ```
-     On Windows:
-     ```
-     set DATABASE_URL=postgresql://<username>:<password>@<host>:<port>/<dbname>
-     ```
+
+   **Option 1: Using Docker (Recommended)**
+   
+   a. Run a PostgreSQL container:
+   ```
+   docker run --name cardano-fileviewer-db -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=cardano -e POSTGRES_DB=fileviewer -p 5432:5432 -d postgres:15
+   ```
+   
+   b. Set the following environment variables:
+   ```
+   export DATABASE_URL=postgresql://cardano:mysecretpassword@localhost:5432/fileviewer
+   ```
+   On Windows:
+   ```
+   set DATABASE_URL=postgresql://cardano:mysecretpassword@localhost:5432/fileviewer
+   ```
+   
+   c. If you need to check the database directly:
+   ```
+   docker exec -it cardano-fileviewer-db psql -U cardano -d fileviewer
+   ```
+   
+   **Option 2: Using a local PostgreSQL installation**
+   
+   a. Create a PostgreSQL database using your preferred method
+   
+   b. Set the following environment variables:
+   ```
+   export DATABASE_URL=postgresql://<username>:<password>@<host>:<port>/<dbname>
+   ```
+   On Windows:
+   ```
+   set DATABASE_URL=postgresql://<username>:<password>@<host>:<port>/<dbname>
+   ```
 
 ## Running the Application
 
@@ -98,7 +123,10 @@ A web-based application that displays the contents of files from a Cardano node 
 ## Troubleshooting
 
 - **Address already in use**: Change the port in `main.py` to an available port
-- **Database connection issues**: Make sure your DATABASE_URL is correct
+- **Database connection issues**: 
+  - Make sure your DATABASE_URL is correct
+  - If you're using Docker, ensure the PostgreSQL container is running with `docker ps`
+  - If your database connection fails, verify PostgreSQL is accepting connections with `docker logs cardano-fileviewer-db`
 - **Docker not found**: Either install Docker and start a Cardano node container, or use the simulation mode
 
 ## Notes for Docker Users
