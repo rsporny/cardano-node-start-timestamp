@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cardano Node Command History</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        .history-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .timestamp {
+            font-size: 0.85rem;
+            color: var(--bs-secondary);
+        }
+        .success-badge {
+            background-color: var(--bs-success);
+        }
+        .error-badge {
+            background-color: var(--bs-danger);
+        }
+        .simulation-badge {
+            background-color: var(--bs-info);
+        }
+        .content-preview {
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.85rem;
+            background-color: var(--bs-dark);
+            color: var(--bs-light);
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            margin-top: 0.5rem;
+        }
+        .filter-button.active {
+            border-color: var(--bs-primary);
+            background-color: rgba(var(--bs-primary-rgb), 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h1 class="card-title mb-0">Command History</h1>
+                        <div>
+                            <a href="/" class="btn btn-secondary">
+                                <i class="fas fa-home"></i> Back to Home
+                            </a>
+                            <button id="refreshHistoryButton" class="btn btn-primary ms-2">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-sm btn-outline-secondary filter-button active" data-filter="all">All</button>
+                                <button class="btn btn-sm btn-outline-secondary filter-button" data-filter="file">File Content</button>
+                                <button class="btn btn-sm btn-outline-secondary filter-button" data-filter="tip">Node Tip</button>
+                                <button class="btn btn-sm btn-outline-secondary filter-button" data-filter="success">Success</button>
+                                <button class="btn btn-sm btn-outline-secondary filter-button" data-filter="error">Errors</button>
+                                <button class="btn btn-sm btn-outline-secondary filter-button" data-filter="simulation">Simulation</button>
+                            </div>
+                        </div>
+                        
+                        <div class="history-container">
+                            <div id="historyList" class="list-group">
+                                <div class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2">Loading command history...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const historyList = document.getElementById('historyList');
+            const refreshHistoryButton = document.getElementById('refreshHistoryButton');
+            const filterButtons = document.querySelectorAll('.filter-button');
+            
+            let currentFilter = 'all';
+            
+            // Function to format date
+            function formatTimestamp(isoString) {
+                try {
+                    const date = new Date(isoString);
+                    return date.toLocaleString();
+                } catch (e) {
+                    console.error('Error formatting timestamp:', e);
+                    return isoString;
+                }
+            }
+            
+            // Function to load history
+            function loadHistory() {
+                historyList.innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading command history...</p>
+                    </div>
+                `;
+                
+                fetch('/api/history')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.logs.length > 0) {
+                            historyList.innerHTML = '';
+                            
+                            // Filter logs based on current filter
+                            let filteredLogs = data.logs;
+                            if (currentFilter === 'file') {
+                                filteredLogs = data.logs.filter(log => log.command_type === 'file');
+                            } else if (currentFilter === 'tip') {
+                                filteredLogs = data.logs.filter(log => log.command_type === 'tip');
+                            } else if (currentFilter === 'success') {
+                                filteredLogs = data.logs.filter(log => log.success);
+                            } else if (currentFilter === 'error') {
+                                filteredLogs = data.logs.filter(log => !log.success);
+                            } else if (currentFilter === 'simulation') {
+                                filteredLogs = data.logs.filter(log => log.simulation);
+                            }
+                            
+                            if (filteredLogs.length === 0) {
+                                historyList.innerHTML = `
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-filter fa-2x mb-3 text-secondary"></i>
+                                        <p>No results match the current filter.</p>
+                                    </div>
+                                `;
+                                return;
+                            }
+                            
+                            // Create history items
+                            filteredLogs.forEach((log) => {
+                                const historyItem = document.createElement('div');
+                                historyItem.className = 'list-group-item';
+                                
+                                // Determine if there's content to preview
+                                const hasContent = log.content && log.content.trim().length > 0;
+                                const hasError = log.error && log.error.trim().length > 0;
+                                
+                                const commandTypeIcon = log.command_type === 'file' 
+                                    ? '<i class="fas fa-file-alt me-2"></i>' 
+                                    : '<i class="fas fa-chart-line me-2"></i>';
+                                
+                                // Create badges
+                                let badges = '';
+                                if (log.success) {
+                                    badges += '<span class="badge success-badge me-1">Success</span>';
+                                } else {
+                                    badges += '<span class="badge error-badge me-1">Error</span>';
+                                }
+                                
+                                if (log.simulation) {
+                                    badges += '<span class="badge simulation-badge me-1">Simulation</span>';
+                                }
+                                
+                                // Create content preview based on success/error
+                                let contentPreview = '';
+                                if (hasContent) {
+                                    // Truncate content if too long
+                                    const truncatedContent = log.content.length > 300 
+                                        ? log.content.substring(0, 300) + '...' 
+                                        : log.content;
+                                    contentPreview = `<div class="content-preview">${truncatedContent}</div>`;
+                                } else if (hasError) {
+                                    contentPreview = `<div class="content-preview text-danger">${log.error}</div>`;
+                                }
+                                
+                                historyItem.innerHTML = `
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h5 class="mb-1">
+                                                ${commandTypeIcon}
+                                                ${log.command_type === 'file' ? 'File Content' : 'Node Tip Information'}
+                                            </h5>
+                                            <p class="mb-1 timestamp">
+                                                <i class="fas fa-clock me-1"></i> ${formatTimestamp(log.timestamp)}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            ${badges}
+                                        </div>
+                                    </div>
+                                    ${contentPreview}
+                                `;
+                                
+                                historyList.appendChild(historyItem);
+                            });
+                        } else {
+                            historyList.innerHTML = `
+                                <div class="text-center py-4">
+                                    <i class="fas fa-history fa-2x mb-3 text-secondary"></i>
+                                    <p>No command history found. Run some commands first.</p>
+                                </div>
+                            `;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading history:', error);
+                        historyList.innerHTML = `
+                            <div class="text-center py-4">
+                                <i class="fas fa-exclamation-triangle fa-2x mb-3 text-danger"></i>
+                                <p>Error loading command history. Please try again.</p>
+                            </div>
+                        `;
+                    });
+            }
+            
+            // Handle filter button clicks
+            filterButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    // Update active button
+                    filterButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    // Update current filter and reload
+                    currentFilter = button.getAttribute('data-filter');
+                    loadHistory();
+                });
+            });
+            
+            // Refresh button click handler
+            refreshHistoryButton.addEventListener('click', loadHistory);
+            
+            // Load history on page load
+            loadHistory();
+        });
+    </script>
+</body>
+</html>
