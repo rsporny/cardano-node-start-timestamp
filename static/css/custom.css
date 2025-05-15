@@ -1,16 +1,36 @@
 /* Additional custom styling */
 
-.file-content-container {
+.file-content-container,
+.tip-content-container {
     max-height: 500px;
     overflow-y: auto;
 }
 
-pre#fileContent {
+pre#fileContent,
+pre#tipContent {
     white-space: pre-wrap;
     word-wrap: break-word;
     min-height: 200px;
     font-family: monospace;
     border: 1px solid var(--bs-border-color);
+}
+
+/* Make the tip information display a bit more colorful */
+pre#tipContent {
+    background-color: var(--bs-dark) !important;
+}
+
+/* Style the tip content to highlight JSON structure */
+pre#tipContent .json-key {
+    color: var(--bs-info);
+}
+
+pre#tipContent .json-value {
+    color: var(--bs-success);
+}
+
+pre#tipContent .json-number {
+    color: var(--bs-warning);
 }
 
 /* Smooth transition for status messages */
